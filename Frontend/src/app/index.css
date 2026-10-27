@@ -4,6 +4,7 @@
 :root { font-family: 'DM Sans', sans-serif; color: #e8ebf3; background: #08090d; font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; background: #08090d; }
+.route-loading { display: grid; min-height: 100vh; place-items: center; color: #9cdbc7; background: #08090d; font-size: 13px; }
 button, textarea { font: inherit; }
 button { cursor: pointer; }
 .app-shell { display: flex; height: 100vh; min-height: 640px; overflow: hidden; background: radial-gradient(circle at 65% 35%, #101521 0, #08090d 42%); }
