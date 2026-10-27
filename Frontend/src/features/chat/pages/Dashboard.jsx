@@ -15,6 +15,7 @@ const Icon = ({ name, size = 18 }) => {
     settings: <><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" /><path d="m19.4 15 .1.1a1.6 1.6 0 0 1-2.3 2.3l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V18.6a1.6 1.6 0 0 1-3.2 0v-.2a1.6 1.6 0 0 0-2.7-1.1l-.1.1a1.6 1.6 0 0 1-2.3-2.3l.1-.1a1.6 1.6 0 0 0-1.1-2.7H5a1.6 1.6 0 0 1 0-3.2h.2a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a1.6 1.6 0 0 1 2.3-2.3l.1.1a1.6 1.6 0 0 0 2.7-1.1V3a1.6 1.6 0 0 1 3.2 0v.2a1.6 1.6 0 0 0 2.7 1.1l.1-.1a1.6 1.6 0 0 1 2.3 2.3l-.1.1a1.6 1.6 0 0 0 1.1 2.7h.2a1.6 1.6 0 0 1 0 3.2h-.2a1.6 1.6 0 0 0-1.1 2.5Z" /></>,
     send: <><path d="m21 3-7.2 18-3.6-7.2L3 10.2 21 3Z" /><path d="M10.2 13.8 21 3" /></>,
     arrow: <path d="m9 18 6-6-6-6" />,
+    trash: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="m9 7 1-2h4l1 2M6 7l1 14h10l1-14" /></>,
     sparkle: <><path d="m12 3 1.3 5.7L19 10l-5.7 1.3L12 17l-1.3-5.7L5 10l5.7-1.3L12 3Z" /><path d="m19 16 .5 2.5L22 19l-2.5.5L19 22l-.5-2.5L16 19l2.5-.5L19 16Z" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
@@ -66,6 +67,12 @@ const Dashboard = () => {
     setMobileSidebar(false)
   }
 
+  const removeChat = async (event, chatId, title) => {
+    event.stopPropagation()
+    if (!window.confirm(`Delete "${title || 'this thread'}"? This cannot be undone.`)) return
+    await chat.handleDeleteChat(chatId)
+  }
+
   const logout = async () => {
     if (await handleLogout()) navigate('/login', { replace: true })
   }
@@ -82,7 +89,10 @@ const Dashboard = () => {
         <div className="history-heading"><span>Recent threads</span><button type="button" aria-label="Search threads"><Icon name="search" size={16} /></button></div>
         <div className="thread-list">
           {chatList.length === 0 && <p className="empty-sidebar">Your conversations will appear here.</p>}
-          {chatList.map((item) => <button className={`thread-item ${item.id === currentChatId ? 'selected' : ''}`} key={item.id} type="button" onClick={() => selectChat(item.id)}>{item.title || 'Untitled thread'}</button>)}
+          {chatList.map((item) => <div className={`thread-row ${item.id === currentChatId ? 'selected' : ''}`} key={item.id}>
+            <button className="thread-item" type="button" onClick={() => selectChat(item.id)}>{item.title || 'Untitled thread'}</button>
+            <button className="delete-thread" type="button" onClick={(event) => removeChat(event, item.id, item.title)} aria-label={`Delete ${item.title || 'thread'}`} title="Delete thread"><Icon name="trash" size={14} /></button>
+          </div>)}
         </div>
         <div className="sidebar-bottom">
           <button className="nav-item" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /> Settings</button>
