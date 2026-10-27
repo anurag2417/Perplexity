@@ -6,6 +6,7 @@ import { setUser, setLoading, setError } from "../auth.slice";
 function getApiError(error, fallback) {
     return error.response?.data?.message
         || error.response?.data?.errors?.[0]?.msg
+        || (error.request && "The server is unavailable. Please try again in a moment.")
         || fallback
 }
 
@@ -18,8 +19,7 @@ export function useAuth() {
         try {
             dispatch(setLoading(true))
             dispatch(setError(null))
-            await register({ email, username, password })
-            return true
+            return await register({ email, username, password })
         } catch (error) {
             dispatch(setError(getApiError(error, "Registration failed")))
             return false
