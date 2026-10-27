@@ -8,7 +8,7 @@ const Register = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState('')
-  const [registeredEmail, setRegisteredEmail] = useState('')
+  const [registered, setRegistered] = useState(false)
   const { handleRegister } = useAuth()
   const loading = useSelector((state) => state.auth.loading)
   const error = useSelector((state) => state.auth.error)
@@ -35,7 +35,7 @@ const Register = () => {
     }
 
     const result = await handleRegister({ username: normalizedUsername, email: normalizedEmail, password })
-    if (result) setRegisteredEmail(normalizedEmail)
+    if (result) setRegistered(true)
   }
 
   return (
@@ -48,11 +48,11 @@ const Register = () => {
           <p>Create a focused workspace for questions, research, and decisions that matter.</p>
         </div>
         <div className="auth-card">
-          {registeredEmail ? (
+          {registered ? (
             <div className="auth-success" role="status">
               <span className="auth-success-icon">✓</span>
-              <h2>Check your inbox</h2>
-              <p>We sent a verification link to <strong>{registeredEmail}</strong>. Verify your email before signing in.</p>
+              <h2>Account created</h2>
+              <p>Your account is ready. Sign in with your email and password to continue.</p>
               <Link className="auth-submit auth-submit-link" to="/login">Continue to sign in</Link>
             </div>
           ) : (

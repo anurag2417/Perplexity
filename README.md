@@ -1,18 +1,18 @@
 # Perplexity
 
-Perplexity is a full-stack AI answer and research workspace. Users can create an account, verify their email, sign in, ask questions, receive AI-generated answers, and keep each question-and-answer exchange in a persistent thread.
+Perplexity is a full-stack AI answer and research workspace. Users can create an account, sign in with email and password, ask questions, receive AI-generated answers, and keep each question-and-answer exchange in a persistent thread.
 
 The repository is split into two independently runnable applications:
 
 - `Frontend`: React 19 + Vite client application.
-- `Backend`: Express API, MongoDB data layer, authentication, email verification, AI integration, and Socket.IO server.
+- `Backend`: Express API, MongoDB data layer, authentication, AI integration, and Socket.IO server.
 
 ## Product capabilities
 
 - Responsive marketing landing page.
 - User registration and validation.
 - Password hashing with bcrypt.
-- Email verification through a signed token and Nodemailer/Gmail OAuth2.
+- Simple email-and-password registration and login.
 - Cookie-based JWT authentication.
 - Protected dashboard route.
 - AI chat responses through Groq.
@@ -57,7 +57,6 @@ Perplexity/
 - npm.
 - MongoDB database, local or hosted.
 - Groq API key for answer generation.
-- Gmail OAuth2 credentials if registration email verification is enabled.
 
 ## Installation
 
@@ -88,10 +87,6 @@ BACKEND_URL=http://localhost:8000
 MONGODB_URI=mongodb://localhost:27017/perplexity
 JWT_SECRET=replace-with-a-long-random-secret
 
-GOOGLE_USER=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REFRESH_TOKEN=
 
 GROQ_API_KEY=
 GROQ_MODEL=openai/gpt-oss-120b
@@ -153,10 +148,6 @@ FRONTEND_URL=https://<your-frontend>.onrender.com
 BACKEND_URL=https://<your-backend>.onrender.com
 MONGODB_URI=<your-mongodb-connection-string>
 JWT_SECRET=<new-long-random-secret>
-GOOGLE_USER=<sender-email>
-GOOGLE_CLIENT_ID=<google-oauth-client-id>
-GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
-GOOGLE_REFRESH_TOKEN=<google-oauth-refresh-token>
 GROQ_API_KEY=<groq-api-key>
 GROQ_MODEL=openai/gpt-oss-120b
 GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
@@ -209,7 +200,7 @@ After both services deploy:
 GET https://<your-backend>.onrender.com/
 ```
 
-Then test registration, email verification, login, chat creation, thread loading, and chat deletion from the frontend. Render free services may sleep when idle, so the first request can take longer.
+Then test registration, login, chat creation, thread loading, and chat deletion from the frontend. Render free services may sleep when idle, so the first request can take longer.
 
 The backend health endpoint is:
 
@@ -255,14 +246,9 @@ node --check src/services/ai.service.js
 1. The user submits the registration form.
 2. The API validates username, email, and password.
 3. The password is hashed before the user is saved.
-4. The user is created with `verified: false`.
-5. The backend emails a signed verification link.
-6. The verification endpoint validates the token and marks the user as verified.
-7. Login is rejected until verification succeeds.
-8. A successful login writes a seven-day JWT into an HTTP cookie.
-9. Protected requests read the cookie through `authUser`.
-
-The verification endpoint currently returns a small HTML confirmation response from the backend and provides a link back to the frontend login page. It is not a separate React route yet.
+4. The user is created as an active account.
+5. A successful login writes a seven-day JWT into an HTTP cookie.
+6. Protected requests read the cookie through `authUser`.
 
 ## AI chat overview
 
@@ -284,10 +270,9 @@ When a signed-in user submits a message:
 
 | Method | Route | Purpose |
 |---|---|---|
-| `POST` | `/api/auth/register` | Create an unverified user and send verification email |
+| `POST` | `/api/auth/register` | Create an active user |
 | `POST` | `/api/auth/login` | Verify credentials and issue JWT cookie |
 | `POST` | `/api/auth/logout` | Clear the JWT cookie |
-| `GET` | `/api/auth/verify-email?token=...` | Verify a user's email |
 
 ### Protected authentication endpoint
 
@@ -313,8 +298,7 @@ All protected routes require the JWT cookie created during login.
 - Do not place API keys in frontend code or `VITE_` variables.
 - Use HTTPS and secure cookie settings in production.
 - Restrict `FRONTEND_URL` to trusted production origins.
-- Configure a production email sender rather than relying on a personal mailbox.
-- Add rate limiting, email-token expiry, and password reset flows before production launch.
+- Add rate limiting and password reset flows before production launch.
 
 ## Further documentation
 

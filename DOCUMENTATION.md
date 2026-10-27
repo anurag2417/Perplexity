@@ -7,13 +7,13 @@ This document explains the current Perplexity implementation feature by feature.
 Perplexity is an AI-powered answer workspace with a deliberately focused SaaS interface. The experience has three primary states:
 
 1. **Discovery**: A public landing page explains the product and directs visitors to registration or sign in.
-2. **Access**: Users register, verify their email, and authenticate through a cookie-backed session.
+2. **Access**: Users register with email and password and authenticate through a cookie-backed session.
 3. **Research workspace**: Authenticated users create threads, ask questions, read Markdown answers, and return to previous conversations.
 
 The application separates presentation from server responsibilities:
 
 - React owns navigation, forms, responsive UI, Redux state, and API orchestration.
-- Express owns validation, authentication, persistence, email, and AI requests.
+- Express owns validation, authentication, persistence, and AI requests.
 - MongoDB owns users, chats, and messages.
 
 ## 2. Feature-by-feature reference
@@ -68,38 +68,7 @@ The backend applies the authoritative validation rules:
 - Email must be valid.
 - Password must be at least six characters.
 
-The user is initially stored with `verified: false`. Registration therefore does not immediately create an authenticated session.
-
-### 2.3 Email confirmation
-
-**Backend locations:**
-
-- `Backend/src/controllers/auth.controller.js`
-- `Backend/src/services/mail.service.js`
-- `Backend/src/routes/auth.routes.js`
-
-After registration, the backend signs a JWT containing the user's email. The verification URL is included in an email:
-
-```text
-GET /api/auth/verify-email?token=<signed-token>
-```
-
-Nodemailer sends the message using Gmail OAuth2 credentials:
-
-- `GOOGLE_USER`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REFRESH_TOKEN`
-
-When the link is opened:
-
-1. The token is read from the query string.
-2. `jwt.verify` validates it.
-3. The user is found by the email in the token.
-4. `verified` is changed to `true`.
-5. The backend returns an HTML success page containing a link to `/login`.
-
-Invalid tokens return a JSON error response with HTTP 400. The current implementation does not yet set an expiry on email-verification tokens and does not have a dedicated React confirmation route.
+Registration creates an active account immediately. No Gmail, OAuth, or email-verification step is required.
 
 ### 2.4 Login
 
@@ -111,10 +80,9 @@ The server:
 
 1. Finds the user by email.
 2. Compares the submitted password with the bcrypt hash.
-3. Rejects unverified accounts.
-4. Signs a seven-day JWT containing the user ID and username.
-5. Writes the token to a cookie.
-6. Returns basic user information.
+3. Signs a seven-day JWT containing the user ID and username.
+4. Writes the token to a cookie.
+5. Returns basic user information.
 
 The frontend stores the returned user in Redux and redirects to `/dashboard`. If a user is already loaded, the page redirects away from login automatically.
 
@@ -400,7 +368,7 @@ The service is available as backend infrastructure, but the current Groq respons
 | `username` | String | Unique, trimmed username |
 | `email` | String | Unique, lowercase email |
 | `password` | String | Bcrypt hash |
-| `verified` | Boolean | Whether email verification succeeded |
+| `verified` | Boolean | Legacy compatibility field; new accounts are active immediately |
 | `createdAt` | Date | Mongoose timestamp |
 | `updatedAt` | Date | Mongoose timestamp |
 
@@ -443,7 +411,7 @@ Failure examples:
 
 - `400`: validation failure.
 - `400`: email or username already exists.
-- `500`: registration or email delivery failure.
+- `500`: unexpected registration failure.
 
 ### `POST /api/auth/login`
 
@@ -461,18 +429,11 @@ Success: `200 OK` with a JWT cookie.
 Failure examples:
 
 - `400`: invalid credentials.
-- `400`: email is not verified.
 - `400`: validation failure.
 
 ### `POST /api/auth/logout`
 
 Clears the authentication cookie and returns a successful logout response. The endpoint is intentionally safe to call even when the cookie is already absent.
-
-### `GET /api/auth/verify-email?token=...`
-
-Success: HTML confirmation response.
-
-Failure: `400` JSON response for an invalid token or unknown user.
 
 ### `GET /api/auth/get-me`
 
@@ -514,14 +475,10 @@ Deletes the chat and all messages belonging to it.
 | Variable | Application | Required | Purpose |
 |---|---|---:|---|
 | `PORT` | Backend | No | HTTP port, defaults to 8000 |
-| `FRONTEND_URL` | Backend | Yes for deployment | Allowed frontend origin and email redirect |
-| `BACKEND_URL` | Backend | Yes for deployment | Base URL used in verification links |
+| `FRONTEND_URL` | Backend | Yes for deployment | Allowed frontend origin |
+| `BACKEND_URL` | Backend | No | Public backend URL, if used by deployment tooling |
 | `MONGODB_URI` | Backend | Yes | MongoDB connection string |
-| `JWT_SECRET` | Backend | Yes | Signs auth and verification tokens |
-| `GOOGLE_USER` | Backend | For email | Gmail sender address |
-| `GOOGLE_CLIENT_ID` | Backend | For email | Google OAuth2 client ID |
-| `GOOGLE_CLIENT_SECRET` | Backend | For email | Google OAuth2 client secret |
-| `GOOGLE_REFRESH_TOKEN` | Backend | For email | Gmail OAuth2 refresh token |
+| `JWT_SECRET` | Backend | Yes | Signs authentication tokens |
 | `GROQ_API_KEY` | Backend | Yes for AI | Groq authentication |
 | `GROQ_MODEL` | Backend | No | Groq model name |
 | `GROQ_API_URL` | Backend | No | OpenAI-compatible Groq endpoint |
@@ -535,7 +492,6 @@ The frontend displays API errors through Redux error state. Common messages incl
 - Failed to load chats.
 - Failed to load messages.
 - Failed to send message.
-- Please verify your email before logging in.
 
 The backend:
 
@@ -552,8 +508,7 @@ Before deploying:
 - Replace all local URLs with production HTTPS URLs.
 - Rotate any credentials that have ever been exposed.
 - Use secure, HTTP-only, same-site cookie settings.
-- Add verification-token expiration.
-- Add rate limiting for login, registration, verification, and AI endpoints.
+- Add rate limiting for login, registration, and AI endpoints.
 - Add password reset and account recovery.
 - Add backend automated tests.
 - Add frontend component and integration tests.
@@ -562,17 +517,12 @@ Before deploying:
 - Add structured logging and monitoring.
 - Configure Socket.IO CORS from environment values instead of a hard-coded local origin.
 - Connect Tavily to the answer-generation path if sourced web answers are required.
-- Replace the inline verification HTML with a branded frontend verification page.
 
 ## 8. Troubleshooting
 
 ### MongoDB connection fails
 
 Check `MONGODB_URI`, database network access, credentials, and whether the MongoDB deployment allows the current IP address.
-
-### Login says email is not verified
-
-Open the verification link from the registration email. Check Gmail OAuth2 credentials and the backend logs if no email is delivered.
 
 ### AI requests fail
 
@@ -620,17 +570,13 @@ FRONTEND_URL=https://<frontend-service>.onrender.com
 BACKEND_URL=https://<backend-service>.onrender.com
 MONGODB_URI=<production-mongodb-uri>
 JWT_SECRET=<new-production-secret>
-GOOGLE_USER=<gmail-sender>
-GOOGLE_CLIENT_ID=<oauth-client-id>
-GOOGLE_CLIENT_SECRET=<oauth-client-secret>
-GOOGLE_REFRESH_TOKEN=<oauth-refresh-token>
 GROQ_API_KEY=<groq-key>
 GROQ_MODEL=openai/gpt-oss-120b
 GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
 TAVILY_API_KEY=<optional-key>
 ```
 
-`BACKEND_URL` is used in verification email links. `FRONTEND_URL` is used for Express and Socket.IO CORS and for the post-verification login link.
+`FRONTEND_URL` is used for Express and Socket.IO CORS.
 
 ### Frontend Static Site
 
@@ -657,7 +603,7 @@ Add the rewrite `/*` to `/index.html` so browser refreshes work for `/login`, `/
 3. Create the frontend static site with `VITE_API_URL`.
 4. Copy the final frontend URL into backend `FRONTEND_URL`.
 5. Redeploy the backend.
-6. Test the health endpoint, registration, verification email, login, and chat.
+6. Test the health endpoint, registration, login, and chat.
 
 The production cookie is configured as HTTP-only, secure, and `SameSite=None` so the separately hosted frontend can authenticate against the backend. HTTPS is required for this cookie configuration.
 
