@@ -49,7 +49,7 @@ export async function register(req, res) {
         await userModel.findByIdAndDelete(user._id);
         console.error("Registration email failed:", error);
         return res.status(502).json({
-            message: "We could not send the verification email. Please try again.",
+            message: "We could not send the verification email. Check the email address or try again later.",
             success: false,
         });
     }
