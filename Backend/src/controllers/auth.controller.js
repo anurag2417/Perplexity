@@ -28,22 +28,31 @@ export async function register(req, res) {
 
     const user = await userModel.create({ username, email, password })
 
-    const emailVerificationToken = jwt.sign({
-        email: user.email,
-    }, process.env.JWT_SECRET)
+    try {
+        const emailVerificationToken = jwt.sign({
+            email: user.email,
+        }, process.env.JWT_SECRET, { expiresIn: "24h" })
 
-    await sendEmail({
-        to: email,
-        subject: "Welcome to Perplexity!",
-        html: `
+        await sendEmail({
+            to: email,
+            subject: "Welcome to Perplexity!",
+            html: `
                 <p>Hi ${username},</p>
                 <p>Thank you for registering at <strong>Perplexity</strong>. We're excited to have you on board!</p>
                 <p>Please verify your email address by clicking the link below:</p>
-                <a href="${process.env.BACKEND_URL || "http://localhost:8000"}/api/auth/verify-email?token=${emailVerificationToken}">Verify Email</a>
+                <a href="${(process.env.BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "")}/api/auth/verify-email?token=${encodeURIComponent(emailVerificationToken)}">Verify Email</a>
                 <p>If you did not create an account, please ignore this email.</p>
                 <p>Best regards,<br>The Perplexity Team</p>
         `
-    });
+        });
+    } catch (error) {
+        await userModel.findByIdAndDelete(user._id);
+        console.error("Registration email failed:", error);
+        return res.status(502).json({
+            message: "We could not send the verification email. Please try again.",
+            success: false,
+        });
+    }
 
     res.status(201).json({
         message: "User registered successfully",
@@ -57,6 +66,20 @@ export async function register(req, res) {
 
 
 
+}
+
+export function logout(req, res) {
+    const isProduction = process.env.NODE_ENV === "production";
+    res.clearCookie("token", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+    });
+
+    return res.status(200).json({
+        message: "Logged out successfully",
+        success: true,
+    });
 }
 
 /**

@@ -286,6 +286,7 @@ When a signed-in user submits a message:
 |---|---|---|
 | `POST` | `/api/auth/register` | Create an unverified user and send verification email |
 | `POST` | `/api/auth/login` | Verify credentials and issue JWT cookie |
+| `POST` | `/api/auth/logout` | Clear the JWT cookie |
 | `GET` | `/api/auth/verify-email?token=...` | Verify a user's email |
 
 ### Protected authentication endpoint

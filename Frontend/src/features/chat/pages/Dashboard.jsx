@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router'
+import { useAuth } from '../../auth/hook/useAuth'
 import { useChat } from '../hooks/useChat'
 
 const Icon = ({ name, size = 18 }) => {
@@ -28,11 +30,14 @@ const Dashboard = () => {
   const chat = useChat()
   const [chatInput, setChatInput] = useState('')
   const [mobileSidebar, setMobileSidebar] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const chats = useSelector((state) => state.chat.chats)
   const currentChatId = useSelector((state) => state.chat.currentChatId)
   const isLoading = useSelector((state) => state.chat.isLoading)
   const error = useSelector((state) => state.chat.error)
   const user = useSelector((state) => state.auth.user)
+  const { handleLogout } = useAuth()
+  const navigate = useNavigate()
   const chatList = useMemo(() => Object.values(chats).sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated)), [chats])
   const activeChat = chats[currentChatId]
   const displayName = user?.username || user?.name || 'there'
@@ -61,6 +66,10 @@ const Dashboard = () => {
     setMobileSidebar(false)
   }
 
+  const logout = async () => {
+    if (await handleLogout()) navigate('/login', { replace: true })
+  }
+
   return (
     <main className="app-shell">
       <aside className={`sidebar ${mobileSidebar ? 'sidebar-open' : ''}`}>
@@ -76,11 +85,20 @@ const Dashboard = () => {
           {chatList.map((item) => <button className={`thread-item ${item.id === currentChatId ? 'selected' : ''}`} key={item.id} type="button" onClick={() => selectChat(item.id)}>{item.title || 'Untitled thread'}</button>)}
         </div>
         <div className="sidebar-bottom">
-          <button className="nav-item" type="button"><Icon name="settings" /> Settings</button>
+          <button className="nav-item" type="button" onClick={() => setSettingsOpen(true)}><Icon name="settings" /> Settings</button>
           <div className="account"><span className="avatar">{displayName.slice(0, 1).toUpperCase()}</span><span className="account-name">{displayName}</span><span className="account-plan">Free</span></div>
         </div>
       </aside>
       {mobileSidebar && <button className="sidebar-overlay" aria-label="Close menu" onClick={() => setMobileSidebar(false)} />}
+      {settingsOpen && <div className="settings-backdrop" role="presentation" onClick={() => setSettingsOpen(false)}>
+        <section className="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" onClick={(event) => event.stopPropagation()}>
+          <div className="settings-heading"><div><p className="eyebrow">Workspace</p><h2 id="settings-title">Settings</h2></div><button className="settings-close" type="button" onClick={() => setSettingsOpen(false)} aria-label="Close settings">×</button></div>
+          <div className="settings-profile"><span className="settings-avatar">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><span>{user?.email || 'Account email unavailable'}</span></div></div>
+          <div className="settings-row"><span>Plan</span><strong>Free</strong></div>
+          <div className="settings-row"><span>Account status</span><strong className="settings-status">Active</strong></div>
+          <button className="logout-button" type="button" onClick={logout}>Log out</button>
+        </section>
+      </div>}
 
       <section className="workspace">
         <header className="topbar"><button className="menu-button" type="button" onClick={() => setMobileSidebar(true)} aria-label="Open menu">☰</button><span className="mobile-title">Perplexity</span><div className="topbar-actions"><button className="icon-button" type="button" aria-label="Search"><Icon name="search" /></button><button className="upgrade-button" type="button">Upgrade <Icon name="arrow" size={15} /></button></div></header>

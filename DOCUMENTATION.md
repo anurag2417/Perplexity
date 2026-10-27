@@ -464,6 +464,10 @@ Failure examples:
 - `400`: email is not verified.
 - `400`: validation failure.
 
+### `POST /api/auth/logout`
+
+Clears the authentication cookie and returns a successful logout response. The endpoint is intentionally safe to call even when the cookie is already absent.
+
 ### `GET /api/auth/verify-email?token=...`
 
 Success: HTML confirmation response.

@@ -1,8 +1,13 @@
 import { useDispatch } from "react-redux";
 import { useCallback } from "react";
-import { register, login, getMe } from "../service/auth.api";
+import { register, login, logout, getMe } from "../service/auth.api";
 import { setUser, setLoading, setError } from "../auth.slice";
 
+function getApiError(error, fallback) {
+    return error.response?.data?.message
+        || error.response?.data?.errors?.[0]?.msg
+        || fallback
+}
 
 export function useAuth() {
 
@@ -16,7 +21,7 @@ export function useAuth() {
             await register({ email, username, password })
             return true
         } catch (error) {
-            dispatch(setError(error.response?.data?.message || "Registration failed"))
+            dispatch(setError(getApiError(error, "Registration failed")))
             return false
         } finally {
             dispatch(setLoading(false))
@@ -31,7 +36,7 @@ export function useAuth() {
             dispatch(setUser(data.user))
             return true
         } catch (error) {
-            dispatch(setError(error.response?.data?.message || "Login failed"))
+            dispatch(setError(getApiError(error, "Login failed")))
             return false
         } finally {
             dispatch(setLoading(false))
@@ -51,10 +56,27 @@ export function useAuth() {
         }
     }, [dispatch])
 
+    const handleLogout = useCallback(async () => {
+        try {
+            dispatch(setLoading(true))
+            dispatch(setError(null))
+            await logout()
+        } catch (error) {
+            dispatch(setError(getApiError(error, "Logout failed")))
+            return false
+        } finally {
+            dispatch(setUser(null))
+            dispatch(setLoading(false))
+        }
+
+        return true
+    }, [dispatch])
+
     return {
         handleRegister,
         handleLogin,
         handleGetMe,
+        handleLogout,
     }
 
 }
