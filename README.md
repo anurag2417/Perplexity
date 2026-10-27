@@ -128,6 +128,89 @@ npm run dev
 
 Open `http://localhost:5173`.
 
+## Deploying on Render
+
+Deploy the backend first, then the frontend. The frontend API URL is embedded at build time by Vite.
+
+### Backend Web Service
+
+Create a Render **Web Service** connected to this repository:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `Backend` |
+| Environment | `Node` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
+| Health Check Path | `/` |
+
+Add these environment variables in Render:
+
+```env
+NODE_ENV=production
+PORT=10000
+FRONTEND_URL=https://<your-frontend>.onrender.com
+BACKEND_URL=https://<your-backend>.onrender.com
+MONGODB_URI=<your-mongodb-connection-string>
+JWT_SECRET=<new-long-random-secret>
+GOOGLE_USER=<sender-email>
+GOOGLE_CLIENT_ID=<google-oauth-client-id>
+GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
+GOOGLE_REFRESH_TOKEN=<google-oauth-refresh-token>
+GROQ_API_KEY=<groq-api-key>
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
+TAVILY_API_KEY=<optional-tavily-key>
+```
+
+Render supplies `PORT` automatically. Keeping `PORT=10000` is acceptable, but the application must continue to listen to `process.env.PORT`.
+
+### Frontend Static Site
+
+Create a Render **Static Site** connected to the same repository:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `Frontend` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
+
+Add this build environment variable:
+
+```env
+VITE_API_URL=https://<your-backend>.onrender.com
+```
+
+Add a rewrite rule so React Router routes work after refresh:
+
+| Source | Destination | Action |
+|---|---|---|
+| `/*` | `/index.html` | Rewrite |
+
+After the frontend URL is created, update the backend `FRONTEND_URL` and redeploy the backend. If the frontend API URL changes, update `VITE_API_URL` and redeploy the static site because Vite embeds it into the production bundle.
+
+### MongoDB Atlas
+
+In MongoDB Atlas:
+
+1. Create or select the production database.
+2. Create a database user with a strong password.
+3. Add the required network access rule for Render.
+4. Copy the application connection string into `MONGODB_URI`.
+5. Append the database name if it is not already present.
+
+For a quick Render deployment, Atlas commonly uses `0.0.0.0/0`, but this permits connections from any IP and should be replaced with a restricted policy where possible.
+
+### Deployment verification
+
+After both services deploy:
+
+```text
+GET https://<your-backend>.onrender.com/
+```
+
+Then test registration, email verification, login, chat creation, thread loading, and chat deletion from the frontend. Render free services may sleep when idle, so the first request can take longer.
+
 The backend health endpoint is:
 
 ```text

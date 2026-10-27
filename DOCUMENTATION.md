@@ -593,7 +593,71 @@ npm run lint
 npm run build
 ```
 
-## 9. Extension guide
+## 9. Render deployment
+
+The project is deployed as two Render services from the same repository.
+
+### Backend Web Service
+
+Use these Render settings:
+
+- Root Directory: `Backend`
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Health Check Path: `/`
+
+The backend now includes a production `start` script. It listens to Render's `PORT` environment variable.
+
+Required production variables:
+
+```env
+NODE_ENV=production
+FRONTEND_URL=https://<frontend-service>.onrender.com
+BACKEND_URL=https://<backend-service>.onrender.com
+MONGODB_URI=<production-mongodb-uri>
+JWT_SECRET=<new-production-secret>
+GOOGLE_USER=<gmail-sender>
+GOOGLE_CLIENT_ID=<oauth-client-id>
+GOOGLE_CLIENT_SECRET=<oauth-client-secret>
+GOOGLE_REFRESH_TOKEN=<oauth-refresh-token>
+GROQ_API_KEY=<groq-key>
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_API_URL=https://api.groq.com/openai/v1/chat/completions
+TAVILY_API_KEY=<optional-key>
+```
+
+`BACKEND_URL` is used in verification email links. `FRONTEND_URL` is used for Express and Socket.IO CORS and for the post-verification login link.
+
+### Frontend Static Site
+
+Use these Render settings:
+
+- Root Directory: `Frontend`
+- Build Command: `npm install && npm run build`
+- Publish Directory: `dist`
+
+Set:
+
+```env
+VITE_API_URL=https://<backend-service>.onrender.com
+```
+
+Add the rewrite `/*` to `/index.html` so browser refreshes work for `/login`, `/register`, and `/dashboard`.
+
+`VITE_API_URL` is a build-time variable. Any change requires a new static-site deployment.
+
+### Deployment order
+
+1. Create the backend service and wait for its Render URL.
+2. Set `BACKEND_URL` and temporarily set the expected frontend URL.
+3. Create the frontend static site with `VITE_API_URL`.
+4. Copy the final frontend URL into backend `FRONTEND_URL`.
+5. Redeploy the backend.
+6. Test the health endpoint, registration, verification email, login, and chat.
+
+The production cookie is configured as HTTP-only, secure, and `SameSite=None` so the separately hosted frontend can authenticate against the backend. HTTPS is required for this cookie configuration.
+
+## 10. Extension guide
 
 When adding a feature:
 

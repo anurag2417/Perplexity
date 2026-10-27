@@ -14,7 +14,7 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 const configuredOrigins = (process.env.FRONTEND_URL || "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 
 const allowedOrigins = new Set([
@@ -25,12 +25,13 @@ const allowedOrigins = new Set([
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.has(origin)) {
+        const normalizedOrigin = origin?.replace(/\/+$/, "");
+        if (!normalizedOrigin || allowedOrigins.has(normalizedOrigin)) {
             callback(null, true);
             return;
         }
 
-        callback(new Error("Origin is not allowed by CORS"));
+        callback(new Error(`Origin is not allowed by CORS: ${origin}`));
     },
     credentials: true,
     methods: [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ],
