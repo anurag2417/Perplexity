@@ -8,24 +8,45 @@ const requiredMailVariables = [
     "GOOGLE_REFRESH_TOKEN",
 ];
 
+function getMailVariable(name) {
+    const value = process.env[name]?.trim();
+
+    if (!value) {
+        return "";
+    }
+
+    if (
+        (value.startsWith("\"") && value.endsWith("\"")) ||
+        (value.startsWith("'") && value.endsWith("'"))
+    ) {
+        return value.slice(1, -1).trim();
+    }
+
+    return value;
+}
+
 function getMissingMailVariables() {
-    return requiredMailVariables.filter((name) => !process.env[name]?.trim());
+    return requiredMailVariables.filter((name) => !getMailVariable(name));
 }
 
 function createTransporter() {
     const missingVariables = getMissingMailVariables();
     if (missingVariables.length > 0) {
-        throw new Error(`Email service is not configured. Missing: ${missingVariables.join(", ")}`);
+        const error = new Error(
+            `Email service is not configured. Missing: ${missingVariables.join(", ")}`
+        );
+        error.code = "EMAIL_CONFIG_MISSING";
+        throw error;
     }
 
     return nodemailer.createTransport({
         service: "gmail",
         auth: {
             type: "OAuth2",
-            user: process.env.GOOGLE_USER,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-            clientId: process.env.GOOGLE_CLIENT_ID,
+            user: getMailVariable("GOOGLE_USER"),
+            clientSecret: getMailVariable("GOOGLE_CLIENT_SECRET"),
+            refreshToken: getMailVariable("GOOGLE_REFRESH_TOKEN"),
+            clientId: getMailVariable("GOOGLE_CLIENT_ID"),
         },
     });
 }
@@ -34,7 +55,7 @@ export async function sendEmail({ to, subject, html, text }) {
     const transporter = createTransporter();
 
     const mailOptions = {
-        from: process.env.GOOGLE_USER,
+        from: getMailVariable("GOOGLE_USER"),
         to,
         subject,
         html,
@@ -50,6 +71,9 @@ export async function sendEmail({ to, subject, html, text }) {
             response: error.response,
             command: error.command,
         });
-        throw new Error("Email provider rejected the verification email");
+        const deliveryError = new Error("Email provider rejected the verification email");
+        deliveryError.code = "EMAIL_PROVIDER_REJECTED";
+        deliveryError.cause = error;
+        throw deliveryError;
     }
 }
