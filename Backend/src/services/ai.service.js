@@ -1,85 +1,112 @@
-import { ChatMistralAI } from "@langchain/mistralai"
-import { HumanMessage, SystemMessage, AIMessage, tool, createAgent } from "langchain";
-import * as z from "zod";
-import { searchInternet } from "./internet.service.js";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 
-const searchInternetTool = tool(
-    searchInternet,
-    {
-        name: "searchInternet",
-        description: "Use this tool to get the latest information from the internet.",
-        schema: z.object({
-            query: z.string().describe("The search query to look up on the internet.")
-        })
-    }
-)
-
-let mistralModel;
-let agent;
-
-function getMistralModel() {
-    if (!mistralModel) {
-        if (!process.env.MISTRAL_API_KEY) {
-            throw new Error("MISTRAL_API_KEY is not configured");
-        }
-
-        mistralModel = new ChatMistralAI({
-            model: "mistral-medium-latest",
-            apiKey: process.env.MISTRAL_API_KEY,
-        });
-    }
-
-    return mistralModel;
-}
-
-function getAgent() {
-    if (!agent) {
-        agent = createAgent({
-            model: getMistralModel(),
-            tools: [ searchInternetTool ],
-        });
-    }
-
-    return agent;
+function toApiMessages(messages) {
+    return [
+        {
+            role: "system",
+            content: "You are a helpful and precise assistant. If you do not know something, say so clearly.",
+        },
+        ...messages.map((message) => ({
+            role: message.role === "ai" ? "assistant" : "user",
+            content: message.content,
+        })),
+    ];
 }
 
 export async function generateResponse(messages) {
-    console.log(messages)
+    if (!process.env.GROQ_API_KEY) {
+        throw new Error("GROQ_API_KEY is not configured");
+    }
 
-    const response = await getAgent().invoke({
-        messages: [
-            new SystemMessage(`
-                You are a helpful and precise assistant for answering questions.
-                If you don't know the answer, say you don't know. 
-                If the question requires up-to-date information, use the "searchInternet" tool to get the latest information from the internet and then answer based on the search results.
-            `),
-            ...(messages.map(msg => {
-                if (msg.role == "user") {
-                    return new HumanMessage(msg.content)
-                } else if (msg.role == "ai") {
-                    return new AIMessage(msg.content)
-                }
-            })) ]
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 16000);
 
-    return response.messages[ response.messages.length - 1 ].text;
+    try {
+        const response = await fetch(process.env.GROQ_API_URL || GROQ_API_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: MODEL,
+                messages: toApiMessages(messages),
+                temperature: 0.2,
+            }),
+            signal: controller.signal,
+        });
+        const body = await response.json().catch(() => ({}));
 
+        if (!response.ok) {
+            throw new Error(`Groq API returned ${response.status}: ${body.error?.message || "request failed"}`);
+        }
+
+        const content = body.choices?.[0]?.message?.content;
+        if (typeof content !== "string" || !content.trim()) {
+            throw new Error("Groq returned an empty response");
+        }
+
+        return content.trim();
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw new Error("Groq API timed out after 16 seconds");
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function fallbackChatTitle(message) {
+    const cleaned = message.trim().replace(/\s+/g, " ");
+    const words = cleaned.split(" ").slice(0, 7).join(" ");
+    return words.length > 48 ? `${words.slice(0, 48).trim()}…` : words || "New conversation";
 }
 
 export async function generateChatTitle(message) {
+    const fallback = fallbackChatTitle(message);
 
-    const response = await getMistralModel().invoke([
-        new SystemMessage(`
-            You are a helpful assistant that generates concise and descriptive titles for chat conversations.
-            
-            User will provide you with the first message of a chat conversation, and you will generate a title that captures the essence of the conversation in 2-4 words. The title should be clear, relevant, and engaging, giving users a quick understanding of the chat's topic.    
-        `),
-        new HumanMessage(`
-            Generate a title for a chat conversation based on the following first message:
-            "${message}"
-            `)
-    ])
+    if (!process.env.GROQ_API_KEY) {
+        return fallback;
+    }
 
-    return response.text;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
+    try {
+        const response = await fetch(process.env.GROQ_API_URL || GROQ_API_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: MODEL,
+                temperature: 0.1,
+                max_tokens: 18,
+                messages: [
+                    {
+                        role: "system",
+                        content: "Create a concise, specific conversation title from the user's message. Return only 3 to 6 words, in title case, with no punctuation, quotes, or prefix.",
+                    },
+                    { role: "user", content: message.trim() },
+                ],
+            }),
+            signal: controller.signal,
+        });
+        const body = await response.json().catch(() => ({}));
+        const title = body.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, "");
+
+        if (!response.ok || !title) {
+            return fallback;
+        }
+
+        return title.slice(0, 60);
+    } catch {
+        return fallback;
+    } finally {
+        clearTimeout(timeout);
+    }
 }

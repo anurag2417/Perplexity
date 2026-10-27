@@ -30,8 +30,8 @@ export function useAuth() {
             const data = await login({ email, password })
             dispatch(setUser(data.user))
             return true
-        } catch (err) {
-            dispatch(setError(err.response?.data?.message || "Login failed"))
+        } catch (error) {
+            dispatch(setError(error.response?.data?.message || "Login failed"))
             return false
         } finally {
             dispatch(setLoading(false))
@@ -44,8 +44,8 @@ export function useAuth() {
             dispatch(setError(null))
             const data = await getMe()
             dispatch(setUser(data.user))
-        } catch (err) {
-            dispatch(setError(err.response?.data?.message || "Failed to fetch user data"))
+        } catch {
+            dispatch(setError(null))
         } finally {
             dispatch(setLoading(false))
         }

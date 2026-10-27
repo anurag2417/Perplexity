@@ -4,6 +4,7 @@ import Register from "../features/auth/pages/Register";
 import Dashboard from "../features/chat/pages/Dashboard";
 import Protected from "../features/auth/components/Protected";
 import { Navigate } from "react-router";
+import Landing from "../features/landing/Landing";
 
 export const router = createBrowserRouter([
     {
@@ -16,12 +17,16 @@ export const router = createBrowserRouter([
     },
     {
         path: "/",
+        element: <Landing />
+    },
+    {
+        path: "/dashboard",
         element: <Protected>
             <Dashboard />
         </Protected>
     },
     {
-        path: "/dashboard",
-        element: <Navigate to="/" replace />
+        path: "/app",
+        element: <Navigate to="/dashboard" replace />
     }
 ])
